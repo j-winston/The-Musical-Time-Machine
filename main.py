@@ -1,8 +1,4 @@
 import datetime as dt
-import urllib.request
-from pprint import pprint
-
-import api_config
 from api_config import CLIENT_ID, CLIENT_SECRET, USER_ID, CODE, ACCESS_TOKEN, REFRESH_TOKEN
 from bs4 import BeautifulSoup
 import requests
@@ -10,7 +6,6 @@ import webbrowser
 import base64
 import json
 from urllib import parse
-from selenium import webdriver
 
 BASE_URL = 'https://api.spotify.com/v1'
 
@@ -37,10 +32,9 @@ def scrape_top_100(billboard_date):
 
 
 def need_code():
-    if len(api_config.CODE) < 1:
+    if len(CODE) < 1:
         return True
     return False
-
 
 
 def get_auth_code():
@@ -83,10 +77,10 @@ def get_access_token():
     print("ACCESS_TOKEN:", response_json['access_token'])
     print("REFRESH_TOKEN:", response_json['refresh_token'])
 
-    token = response_json['access_token']
+    access_token = response_json['access_token']
     refresh_token = response_json['refresh_token']
 
-    return token, refresh_token
+    return access_token, refresh_token
 
 
 def search_songs(song_list, access_token):
@@ -98,18 +92,22 @@ def search_songs(song_list, access_token):
         song_title = parse.quote(song_title)
         artist_name = parse.quote(artist_name)
 
-    auth_headers = {
-        'Authorization': "Bearer " + access_token,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-    }
+        auth_headers = {
+            'Authorization': "Bearer " + access_token,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
 
-    query = f"artist:{artist_name}+name:{song_title}&type=track&limit=1"
-    search_url = f"https://api.spotify.com/v1/search?query={query}"
+        query = f"artist:{artist_name}+name:{song_title}&type=track&limit=1"
+        search_url = f"https://api.spotify.com/v1/search?query={query}"
+        search_results = requests.get(url=search_url, headers=auth_headers)
 
-    search_results = requests.get(url=search_url, headers=auth_headers)
-    song_id = search_results.json()['tracks']['items'][0]['id']
-    song_id_list.append(song_id)
+        try:
+            song_id = search_results.json()['tracks']['items'][0]['id']
+        except IndexError:
+            continue
+        else:
+            song_id_list.append(song_id)
 
     print(song_id_list)
     return song_id_list
@@ -131,7 +129,8 @@ def create_new_playlist(access_token, playlist_title):
     # Critical step
     post_data = json.dumps(post_data)
 
-    playlist_response = requests.post(url=f"https://api.spotify.com/v1/users/{USER_ID}/playlists", data=post_data, headers=access_headers)
+    playlist_response = requests.post(url=f"https://api.spotify.com/v1/users/{USER_ID}/playlists", data=post_data,
+                                      headers=access_headers)
     try:
         playlist_response.json()['error']
     except KeyError:
@@ -158,12 +157,10 @@ def add_to_playlist(song_id_list, access_token, list_id):
         }
         post_data = json.dumps(post_data)
 
-        playlist_url = BASE_URL + f"/{list_id}/tracks"
-        r = requests.post(url=f"https://api.spotify.com/v1/users/{USER_ID}/playlists/{list_id}/tracks",
-                          headers=playlist_headers,
-                          data=post_data)
-        if len(r.json()['snapshot_id']) > 1:
-            print(f"{track_id} added successfully")
+        response = requests.post(url=f"https://api.spotify.com/v1/users/{USER_ID}/playlists/{list_id}/tracks",
+                                 headers=playlist_headers,
+                                 data=post_data)
+        print(f"{track_id} added successfully")
 
 
 def token_expired(access_token):
@@ -192,7 +189,7 @@ def token_expired(access_token):
 
 
 def need_token():
-    if len(api_config.ACCESS_TOKEN) < 1:
+    if len(ACCESS_TOKEN) < 1:
         return True
     return False
 
@@ -223,19 +220,13 @@ def refresh_token(refreshed_token):
 
     return new_access_token, new_refresh_token
 
-
-
-
-
-
 # --------MAIN----------#
 
-# date = input("Which year do you want to travel to? "
-#              "Type the date in this format YYYY-MM-DD:")
-# date_dt = dt.datetime.strptime(date, "%Y-%m-%d")
-# playlist_date = date_dt.strftime("%Y-%m-%d")
 
-playlist_date = '1981-01-01'
+date = input("Which year do you want to travel to? "
+             "Type the date in this format YYYY-MM-DD:")
+date_dt = dt.datetime.strptime(date, "%Y-%m-%d")
+playlist_date = date_dt.strftime("%Y-%m-%d")
 
 if need_code():
     get_auth_code()
@@ -243,8 +234,8 @@ if need_code():
 if need_token():
     token, refresh_token = get_access_token()
 else:
-    token = api_config.ACCESS_TOKEN
-    refresh_token = api_config.REFRESH_TOKEN
+    token = ACCESS_TOKEN
+    refresh_token = REFRESH_TOKEN
 
 if not token_expired(token):
     playlist_id = create_new_playlist(token, playlist_title=playlist_date)
