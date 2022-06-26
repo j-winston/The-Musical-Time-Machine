@@ -1,3 +1,4 @@
+#! /usr/bin/python3
 import datetime as dt
 from api_config import CLIENT_ID, CLIENT_SECRET, USER_ID, CODE, ACCESS_TOKEN, REFRESH_TOKEN
 from bs4 import BeautifulSoup
@@ -6,6 +7,7 @@ import webbrowser
 import base64
 import json
 from urllib import parse
+import pprint
 
 BASE_URL = 'https://api.spotify.com/v1'
 
@@ -31,7 +33,7 @@ def scrape_top_100(billboard_date):
     return top100_playlist
 
 
-def need_code():
+def need_auth_code():
     if len(CODE) < 1:
         return True
     return False
@@ -109,7 +111,7 @@ def search_songs(song_list, access_token):
         else:
             song_id_list.append(song_id)
 
-    print(song_id_list)
+    pprint.pprint(song_id_list)
     return song_id_list
 
 
@@ -188,37 +190,42 @@ def token_expired(access_token):
             return False
 
 
-def need_token():
+def need_access_token():
     if len(ACCESS_TOKEN) < 1:
         return True
     return False
 
 
-def refresh_token(refreshed_token):
+def get_new_access_token(refreshed_token):
 
     base64_credentials = base64.b64encode(CLIENT_ID.encode() + b':' + CLIENT_SECRET.encode()).decode("utf-8")
     auth_url = "https://accounts.spotify.com/api/token"
 
-    token_headers = {
+    headers = {
         "Authorization": "Basic " + base64_credentials,
         "Content-Type": "application/x-www-form-urlencoded",
     }
 
-    token_data = {
-        "grant_type": "authorization_code",
-        "code": refreshed_token,
-        "redirect_uri": "http://localhost:8888/callback"
+    post_body = {
+        "grant_type": "refresh_token",
+        "refresh_token": refreshed_token
     }
 
-    spotify_response = requests.post(url=auth_url, headers=token_headers, data=token_data)
+    spotify_response = requests.post(url=auth_url, headers=headers, data=post_body)
     response_json = spotify_response.json()
-    print("NEW", response_json['access_token'])
-    print("NEW", response_json['refresh_token'])
-
     new_access_token = response_json['access_token']
-    new_refresh_token = response_json['refresh_token']
+    print("New access token granted:", response_json['access_token'])
 
-    return new_access_token, new_refresh_token
+    # Test if there's a new refresh token being sent back
+    try:
+        new_refresh_token = response_json['refresh_token']
+        print("NEW REFRESH TOKEN:", response_json)
+    except KeyError:
+        pass
+    else:
+        pass
+        # Later, new refresh token should be written to disk
+    return new_access_token
 
 # --------MAIN----------#
 
@@ -228,22 +235,29 @@ date = input("Which year do you want to travel to? "
 date_dt = dt.datetime.strptime(date, "%Y-%m-%d")
 playlist_date = date_dt.strftime("%Y-%m-%d")
 
-if need_code():
+
+
+if need_auth_code():
     get_auth_code()
 
-if need_token():
+if need_access_token():
     token, refresh_token = get_access_token()
 else:
     token = ACCESS_TOKEN
     refresh_token = REFRESH_TOKEN
 
-if not token_expired(token):
-    playlist_id = create_new_playlist(token, playlist_title=playlist_date)
-    scraped_list = scrape_top_100(playlist_date)
-    spotify_song_id_list = search_songs(song_list=scraped_list, access_token=token)
-    add_to_playlist(spotify_song_id_list, token, playlist_id)
-else:
-    token, refresh_token = refresh_token(refresh_token)
+if token_expired(token):
+    token = get_new_access_token(REFRESH_TOKEN)
+
+playlist_id = create_new_playlist(token, playlist_title=playlist_date)
+scraped_list = scrape_top_100(playlist_date)
+spotify_song_id_list = search_songs(song_list=scraped_list, access_token=token)
+add_to_playlist(spotify_song_id_list, token, playlist_id)
+
+
+
+
+
 
 
 
