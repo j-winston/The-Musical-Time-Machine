@@ -1,3 +1,4 @@
+
 #! /usr/bin/python3
 import datetime as dt
 from api_config import CLIENT_ID, CLIENT_SECRET, USER_ID, CODE, ACCESS_TOKEN, REFRESH_TOKEN
@@ -11,7 +12,7 @@ import pprint
 
 BASE_URL = 'https://api.spotify.com/v1'
 
-
+# Scrape and return a list of 100 tuples as (song, artist)
 def scrape_top_100(billboard_date):
     year = billboard_date.split('-')[0]
     month = billboard_date.split('-')[1]
@@ -38,7 +39,7 @@ def need_auth_code():
         return True
     return False
 
-
+# Opens a browser window and prompts for user to login
 def get_auth_code():
     auth_url = 'https://accounts.spotify.com/authorize'
     scope = 'user-library-read user-library-modify playlist-modify-private playlist-modify-public'
@@ -49,12 +50,12 @@ def get_auth_code():
         'redirect_uri': 'http://localhost:8888/callback',
         'scope': scope
     }
-
-    # The response object contains the link to authorize app
+    
     spotify_response = requests.get(url=auth_url, params=auth_params)
+    # Get the URL that spotify returned 
     auth_link = spotify_response.url
 
-    # Now open browser window with link
+    # Now open that URL in a browser, the code is in the callback URL 
     webbrowser.open(auth_link)
 
 
@@ -128,7 +129,7 @@ def create_new_playlist(access_token, playlist_title):
         "description": "user playlist",
         "public": "false"
     }
-    # Critical step
+    # Make sure search is in json format or it will be rejected!
     post_data = json.dumps(post_data)
 
     playlist_response = requests.post(url=f"https://api.spotify.com/v1/users/{USER_ID}/playlists", data=post_data,
@@ -243,6 +244,7 @@ if need_auth_code():
 if need_access_token():
     token, refresh_token = get_access_token()
 else:
+    # Get token and refresh from api_config.py file
     token = ACCESS_TOKEN
     refresh_token = REFRESH_TOKEN
 
